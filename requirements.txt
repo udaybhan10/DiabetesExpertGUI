@@ -1,0 +1,9 @@
+gradio
+transformers
+peft
+accelerate
+torch
+bitsandbytes
+sentencepiece
+protobuf
+safetensors
