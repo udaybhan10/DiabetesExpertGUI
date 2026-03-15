@@ -6,7 +6,7 @@ A professional Gradio interface for the **Diabetes Expert SLM**. This GUI allows
 
 ## 💻 Hardware Requirements
 
-- **Local Development (Python/MLX)**: Requires an **Apple Silicon (M1/M2/M3/M4)** Mac. This version is hardware-accelerated via MLX for near-instant clinical reasoning.
+- **Local Development (Python/MLX)**: Requires an **Apple Silicon (M1/M2/M3/M4/M5)** Mac. This version is hardware-accelerated via MLX for near-instant clinical reasoning.
 - **Global Deployment (Docker)**: Cross-platform. Can run on Linux, Windows, or macOS (Intel/Apple) as it utilizes the `transformers` backend.
 
 ## 📥 Setup & Usage
