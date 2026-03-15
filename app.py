@@ -1,6 +1,6 @@
 import gradio as gr
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import PeftModel
 import os
 
@@ -40,20 +40,25 @@ def load_model():
         # Check for GPU availability
         if torch.cuda.is_available():
             print("GPU detected, loading in 4-bit...")
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_use_double_quant=True,
+            )
             device_map = "auto"
             torch_dtype = torch.bfloat16
-            load_in_4bit = True 
         else:
             print("No GPU detected, loading on CPU...")
+            quantization_config = None
             device_map = {"": "cpu"}
             torch_dtype = torch.float32
-            load_in_4bit = False
         
         base_model = AutoModelForCausalLM.from_pretrained(
             HF_BASE_MODEL,
             torch_dtype=torch_dtype,
             device_map=device_map,
-            load_in_4bit=load_in_4bit,
+            quantization_config=quantization_config,
             trust_remote_code=True,
             token=token
         )
@@ -139,7 +144,7 @@ with gr.Blocks(title="Diabetes Expert SLM GUI") as demo:
     chatbot = gr.Chatbot(
         show_label=False, 
         container=True, 
-        height=500,
+        height=450, # Reduced height for better visibility
         avatar_images=(None, "https://cdn-icons-png.flaticon.com/512/387/387561.png")
     )
     
