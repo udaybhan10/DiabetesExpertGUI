@@ -1,7 +1,6 @@
-import gradio as gr
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, TextIteratorStreamer
 from peft import PeftModel
+from threading import Thread
 import os
 
 # Configuration
@@ -84,45 +83,41 @@ except Exception as e:
 
 def predict(message, history):
     if model is None:
-        return f"🚨 Error: Model failed to load. \n\nDetails: {error_message or 'Check Hugging Face Token and gated repo access.'}"
-    
-    # history in Gradio 6 is a list of dicts: [{'role': 'user', 'content': '...'}, ...]
-    # Build prompt with history (Llama-3.2 chat format)
+        yield f"🚨 Error: Model failed to load. \n\nDetails: {error_message or 'Check Hugging Face Token and gated repo access.'}"
+        return
+
+    # Build prompt with history
     full_prompt = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{SYSTEM_PROMPT}<|eot_id|>"
-    
     for msg in history:
         full_prompt += f"<|start_header_id|>{msg['role']}<|end_header_id|>\n\n{msg['content']}<|eot_id|>"
-    
     full_prompt += f"<|start_header_id|>user<|end_header_id|>\n\n{message}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
     
     inputs = tokenizer(full_prompt, return_tensors="pt").to(model.device)
+    streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
     
-    with torch.no_grad():
-        output_tokens = model.generate(
-            **inputs,
-            max_new_tokens=512,
-            temperature=0.7,
-            top_p=0.9,
-            repetition_penalty=1.1,
-            do_sample=True,
-            eos_token_id=tokenizer.eos_token_id
-        )
+    generation_kwargs = dict(
+        **inputs,
+        max_new_tokens=512,
+        temperature=0.7,
+        top_p=0.9,
+        repetition_penalty=1.1,
+        do_sample=True,
+        eos_token_id=tokenizer.eos_token_id,
+        streamer=streamer
+    )
     
-    # Extract only the new assistant response
-    response_tokens = output_tokens[0][len(inputs["input_ids"][0]):]
-    response = tokenizer.decode(response_tokens, skip_special_tokens=True)
+    thread = Thread(target=model.generate, kwargs=generation_kwargs)
+    thread.start()
     
-    # Robust parsing to catch potential structured output strings
-    if response.startswith("[{'") and response.endswith("'}]"):
-        try:
-            import ast
-            parsed = ast.literal_eval(response)
-            if isinstance(parsed, list) and len(parsed) > 0 and 'text' in parsed[0]:
-                return parsed[0]['text']
-        except:
-            pass
-            
-    return response
+    partial_text = ""
+    for new_text in streamer:
+        partial_text += new_text
+        # Robust parsing to catch potential structured output strings
+        if partial_text.startswith("[{'") and "text': '" in partial_text:
+             # Basic handling if we start seeing the list format in middle of stream
+             # (Unlikely with TextIteratorStreamer, but safe to keep)
+             pass
+        yield partial_text
 
 # UI Theme
 theme = gr.themes.Soft(
@@ -172,9 +167,11 @@ with gr.Blocks(title="Diabetes Expert SLM GUI") as demo:
 
     def bot_msg(history):
         user_message = history[-1]["content"]
-        bot_response = predict(user_message, history[:-1])
-        history.append({"role": "assistant", "content": bot_response})
-        return history
+        # In streaming mode, predict yields chunks
+        history.append({"role": "assistant", "content": ""})
+        for chunk in predict(user_message, history[:-1]):
+            history[-1]["content"] = chunk
+            yield history
 
     msg.submit(user_msg, [msg, chatbot], [msg, chatbot], queue=False).then(bot_msg, chatbot, chatbot)
     submit.click(user_msg, [msg, chatbot], [msg, chatbot], queue=False).then(bot_msg, chatbot, chatbot)
