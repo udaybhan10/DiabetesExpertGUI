@@ -4,38 +4,31 @@
 
 A professional Gradio interface for the **Diabetes Expert SLM**. This GUI allows users to chat with the model about 2026 ADA Standards of Care and deep pathophysiology logic locally or via the cloud.
 
-## 🚀 Features
-- **Medical Expertise**: Fine-tuned on distilled PubMed research and ADA 2026 revisions.
-- **Cross-Platform**: Uses the `transformers` backend to run on standard CPUs and NVIDIA GPUs.
-- **Dockerized**: Easy deployment to Hugging Face Spaces or private servers.
+## 💻 Hardware Requirements
+
+- **Local Development (Python/MLX)**: Requires an **Apple Silicon (M1/M2/M3/M4)** Mac. This version is hardware-accelerated via MLX for near-instant clinical reasoning.
+- **Global Deployment (Docker)**: Cross-platform. Can run on Linux, Windows, or macOS (Intel/Apple) as it utilizes the `transformers` backend.
 
 ## 📥 Setup & Usage
 
-### Local Execution (Python)
-1. **Clone the repository**:
+### 🍎 Local Preview (Apple Silicon Only)
+To run with hardware acceleration on your Mac:
+1. **Clone and Install**:
    ```bash
    git clone https://github.com/udaybhan10/DiabetesExpertGUI.git
    cd DiabetesExpertGUI
-   ```
-
-2. **Install dependencies**:
-   ```bash
    pip install -r requirements.txt
    ```
-
-3. **Run the app**:
+2. **Run MLX Demo**:
    ```bash
-   python app.py
+   python local_demo_mlx.py
    ```
 
-### Local Execution (Docker)
-1. **Build the image**:
+### 🐳 Global/Docker Execution (Cross-Platform)
+For Hugging Face Spaces or non-Mac systems:
+1. **Build and Run**:
    ```bash
    docker build -t diabetes-expert-gui .
-   ```
-
-2. **Run the container**:
-   ```bash
    docker run -p 7860:7860 diabetes-expert-gui
    ```
 
