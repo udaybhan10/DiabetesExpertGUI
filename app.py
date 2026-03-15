@@ -30,41 +30,56 @@ SYSTEM_PROMPT = (
 
 def load_model():
     print("Loading model and adapters...")
-    tokenizer = AutoTokenizer.from_pretrained(HF_BASE_MODEL)
+    token = os.getenv("HF_TOKEN")
+    if not token:
+        print("Warning: HF_TOKEN not found in environment variables. Model loading might fail for gated repos.")
     
-    # Check for GPU availability
-    if torch.cuda.is_available():
-        device_map = "auto"
-        torch_dtype = torch.bfloat16
-        load_in_4bit = True # Use bitsandbytes for 4-bit on GPU
-    else:
-        device_map = {"": "cpu"}
-        torch_dtype = torch.float32
-        load_in_4bit = False
-    
-    base_model = AutoModelForCausalLM.from_pretrained(
-        HF_BASE_MODEL,
-        torch_dtype=torch_dtype,
-        device_map=device_map,
-        load_in_4bit=load_in_4bit,
-        trust_remote_code=True
-    )
-    
-    # Load LoRA adapters
-    model = PeftModel.from_pretrained(base_model, ADAPTER_ID)
-    model.eval()
-    return model, tokenizer
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(HF_BASE_MODEL, token=token)
+        
+        # Check for GPU availability
+        if torch.cuda.is_available():
+            print("GPU detected, loading in 4-bit...")
+            device_map = "auto"
+            torch_dtype = torch.bfloat16
+            load_in_4bit = True 
+        else:
+            print("No GPU detected, loading on CPU...")
+            device_map = {"": "cpu"}
+            torch_dtype = torch.float32
+            load_in_4bit = False
+        
+        base_model = AutoModelForCausalLM.from_pretrained(
+            HF_BASE_MODEL,
+            torch_dtype=torch_dtype,
+            device_map=device_map,
+            load_in_4bit=load_in_4bit,
+            trust_remote_code=True,
+            token=token
+        )
+        
+        # Load LoRA adapters
+        model = PeftModel.from_pretrained(base_model, ADAPTER_ID, token=token)
+        model.eval()
+        return model, tokenizer
+    except Exception as e:
+        print(f"Detailed loading error: {str(e)}")
+        raise e
 
 # Initialize model
+model = None
+tokenizer = None
+error_message = None
+
 try:
     model, tokenizer = load_model()
 except Exception as e:
-    print(f"Error loading model: {e}")
-    model, tokenizer = None, None
+    error_message = str(e)
+    print(f"Initialization failed: {error_message}")
 
 def predict(message, history):
     if model is None:
-        return "Error: Model not loaded correctly. Check adapter compatibility or Hugging Face token."
+        return f"🚨 Error: Model failed to load. \n\nDetails: {error_message or 'Check Hugging Face Token and gated repo access.'}"
     
     # history in Gradio 6 is a list of dicts: [{'role': 'user', 'content': '...'}, ...]
     # Build prompt with history (Llama-3.2 chat format)
